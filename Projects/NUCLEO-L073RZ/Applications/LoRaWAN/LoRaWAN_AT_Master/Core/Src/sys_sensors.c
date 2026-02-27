@@ -19,6 +19,13 @@
 
 /* Includes ------------------------------------------------------------------*/
 #include "sys_sensors.h"
+#include <stdlib.h>
+#include "lrwan_ns1_temperature.h"
+#include "lrwan_ns1_humidity.h"
+#include "lrwan_ns1_pressure.h"
+#include "lrwan_ns1_printf.h"
+#include "master_app.h"
+
 /* USER CODE BEGIN Includes */
 
 /* USER CODE END Includes */
@@ -65,6 +72,14 @@ IKS01A2_ENV_SENSOR_Capabilities_t EnvCapabilities;
 // 3. TODO LORA USE_LRWAN_NS1: instanciate handle variables for humidity, temperature and pressure
 // 3. TODO LORA USE_LRWAN_NS1: #if defined()/#endif style
 
+#if defined(USE_LRWAN_NS1)
+void *TemperatureHandle = NULL;
+void *HumidityHandle    = NULL;
+void *PressureHandle    = NULL;
+#endif
+
+
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -85,6 +100,10 @@ void EnvSensors_Read(sensor_t *sensor_data)
   // 5. TODO LORA USE_LRWAN_NS1: get values from humidity, temperature and pressure sensors
   // 5. TODO LORA USE_LRWAN_NS1: #if defined()/#elif style (next if becomes an elif)
   // 5. TODO LORA USE_LRWAN_NS1: otherwhise they are always using the same default values (which ones?)
+
+
+
+
 #if defined (SENSOR_ENABLED) && (SENSOR_ENABLED == 1)
 #if (USE_IKS01A2_ENV_SENSOR_HTS221_0 == 1)
   IKS01A2_ENV_SENSOR_GetValue(HTS221_0, ENV_HUMIDITY, &HUMIDITY_Value);
@@ -104,6 +123,27 @@ void EnvSensors_Read(sensor_t *sensor_data)
 
   sensor_data->latitude  = (int32_t)((STSOP_LATTITUDE  * MAX_GPS_POS) / 90);
   sensor_data->longitude = (int32_t)((STSOP_LONGITUDE  * MAX_GPS_POS) / 180);
+
+#if defined(USE_LRWAN_NS1)
+
+
+/* Read temperature */
+BSP_TEMPERATURE_Get_Temp(TemperatureHandle, &sensor_data->temperature);
+dbg_printf_send("valeur de la température de notre capteur est : %.2f C\r\n", sensor_data->temperature);
+
+/* Read humidity */
+BSP_HUMIDITY_Get_Hum(HumidityHandle, &sensor_data->humidity);
+dbg_printf_send("valeur d'humiditée de notre capteur est : %.2f \%\r\n", sensor_data->humidity);
+
+/* Read pressure */
+BSP_PRESSURE_Get_Press(PressureHandle, &sensor_data->pressure);
+dbg_printf_send("valeur de la pression de notre capteur est : %.2f hPa\r\n", sensor_data->pressure);
+
+
+#endif
+
+
+
   /* USER CODE BEGIN EnvSensors_Read_Last */
 
   /* USER CODE END EnvSensors_Read_Last */
@@ -114,10 +154,49 @@ void  EnvSensors_Init(void)
   /* USER CODE BEGIN EnvSensors_Init_1 */
 
   /* USER CODE END EnvSensors_Init_1 */
-  
+
   // 4. TODO LORA USE_LRWAN_NS1: initialize sensors
   // 4. TODO LORA USE_LRWAN_NS1: #if defined()/#elif style (next if becomes an elif)
   // 4. TODO LORA USE_LRWAN_NS1: and maybe also do something else (are they activated?)
+
+#if defined(USE_LRWAN_NS1)
+
+DrvStatusTypeDef status;
+
+/* -------- Temperature -------- */
+status = BSP_TEMPERATURE_Init(HTS221_T_0, &TemperatureHandle);
+if (status == COMPONENT_OK)
+{
+  BSP_TEMPERATURE_Sensor_Enable(TemperatureHandle);
+}
+else
+{
+  dbg_printf_send("Temperature init failed\n");
+}
+
+/* -------- Humidity -------- */
+status = BSP_HUMIDITY_Init(HTS221_H_0, &HumidityHandle);
+if (status == COMPONENT_OK)
+{
+  BSP_HUMIDITY_Sensor_Enable(HumidityHandle);
+}
+else
+{
+  dbg_printf_send("Humidity init failed\n");
+}
+
+/* -------- Pressure -------- */
+status = BSP_PRESSURE_Init(LPS22HB_P_0, &PressureHandle);
+if (status == COMPONENT_OK)
+{
+  BSP_PRESSURE_Sensor_Enable(PressureHandle);
+}
+else
+{
+  dbg_printf_send("Pressure init failed\n");
+}
+
+#endif
 
 #if defined (SENSOR_ENABLED) && (SENSOR_ENABLED == 1)
   /* Init */

@@ -1,21 +1,21 @@
 /**
-  ******************************************************************************
-  * @file    Lora_driver.c
-  * @author  MCD Application Team
-  * @brief   LoRa module API
-  ******************************************************************************
-  * @attention
-  *
-  * <h2><center>&copy; Copyright (c) 2018 STMicroelectronics.
-  * All rights reserved.</center></h2>
-  *
-  * This software component is licensed by ST under Ultimate Liberty license
-  * SLA0044, the "License"; You may not use this file except in compliance with
-  * the License. You may obtain a copy of the License at:
-  *                             www.st.com/SLA0044
-  *
-  ******************************************************************************
-  */
+ ******************************************************************************
+ * @file    Lora_driver.c
+ * @author  MCD Application Team
+ * @brief   LoRa module API
+ ******************************************************************************
+ * @attention
+ *
+ * <h2><center>&copy; Copyright (c) 2018 STMicroelectronics.
+ * All rights reserved.</center></h2>
+ *
+ * This software component is licensed by ST under Ultimate Liberty license
+ * SLA0044, the "License"; You may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at:
+ *                             www.st.com/SLA0044
+ *
+ ******************************************************************************
+ */
 
 /* Includes ------------------------------------------------------------------*/
 #include <stdbool.h>
@@ -28,6 +28,7 @@
 #include "ee.h"
 #include "stm32_mem.h"
 #include "app_master.h"
+#include "lrwan_ns1_printf.h"
 #if USE_LRWAN_NS1
 #include "stdio.h"
 #include "usart.h"
@@ -44,8 +45,6 @@ ATCmd_t gFlagException = AT_END_AT;
 
 /* Private typedef -----------------------------------------------------------*/
 
-
-
 /* Private variable ----------------------------------------------------------*/
 #ifdef USE_LRWAN_NS1
 #define FW_VER      "VERSION: v0.1.8 20th November,2017\r\n"
@@ -56,7 +55,7 @@ extern char response[DATA_RX_MAX_BUFF_SIZE];
 #if USE_MDM32L07X01 | USE_LRWAN_NS1
 static UTIL_TIMER_Object_t JoinStatusDelayTimer; /*timer to handle the join status delay*/
 #endif
-static __IO uint8_t JoinTimeOutFlag = 0;  /*to indicate if timeout raised on Join procedure*/
+static __IO uint8_t JoinTimeOutFlag = 0; /*to indicate if timeout raised on Join procedure*/
 
 #if USE_LRWAN_NS1
 #define DATA_BINARY_BUF_SZ 96
@@ -80,16 +79,16 @@ static sSendDataBinary_t SendDataBinary = { DataBinaryBuff, 0};
 static LoRaDriverCallback_t *LoraDriverCallbacks;
 static LoRaDriverParam_t *LoraDriverParam;
 
-static uint8_t PtrValueFromDevice[32]  ;  /*to get back the device address in */
+static uint8_t PtrValueFromDevice[32]; /*to get back the device address in */
 /*11:22:33:44 format before*/
 /*to be translated into uint32_t type*/
 
-static uint8_t PtrTempValueFromDevice[32]  ;  /*to get back the device address in */
+static uint8_t PtrTempValueFromDevice[32]; /*to get back the device address in */
 /*11:22:33;44:55:66:77 format before*/
 /*to be translated into and array of */
 /*8 uint8_t*/
 
-static uint8_t PtrTempValueFromDeviceKey[47]  ;  /* in relation with the response size*/
+static uint8_t PtrTempValueFromDeviceKey[47]; /* in relation with the response size*/
 
 #if USE_I_NUCLEO_LRWAN1 || USE_MDM32WL
 static uint8_t PtrDataFromNetwork[64]  ;      /* Payload size max returned by USI modem or WL55 modem*/
@@ -102,11 +101,11 @@ static void Lora_OnJoinProtectTimerEvt(void *context);
 static UTIL_TIMER_Object_t JoinProtectTimer;  /* timer to protect the  USI Join request*/
 #endif
 
-static DeviceState_t DeviceState = DEVICE_INIT ;
+static DeviceState_t DeviceState = DEVICE_INIT;
 
-static DeviceState_t DeviceSubState = DEVICE_INIT ; /* to manage the join transition*/
+static DeviceState_t DeviceSubState = DEVICE_INIT; /* to manage the join transition*/
 
-static UTIL_TIMER_Object_t DemoLedTimer;                  /*timer to handle Demo Led*/
+static UTIL_TIMER_Object_t DemoLedTimer; /*timer to handle Demo Led*/
 
 __IO uint8_t SensorTimerWakeup = 0;
 
@@ -138,8 +137,6 @@ uint8_t FWVersion = USI_FW_V30;             /*we fix the FWVersion to 3.0 value*
 /*From since, we expect that USI modem*/
 /*will be manufactured with Version > 4.0*/
 
-
-
 /* Private functions ---------------------------------------------------------*/
 
 #if USE_MDM32L07X01 | USE_LRWAN_NS1
@@ -152,85 +149,79 @@ static ATEerror_t Lora_Send(void);
 
 static void Lora_OnNextSensorMeasureTimerEvt(void *context);
 
-static void Lora_OnLedTimerEvent(void *context);         /*timer function to handle Demo Led*/
-
+static void Lora_OnLedTimerEvent(void *context); /*timer function to handle Demo Led*/
 
 /**************************************************************
-  * @brief  Check if the LoRa module is working
-  * @param  void
-  * @retval status of the module (ready or not ready)
-  **************************************************************/
-RetCode_t Lora_Init(void)
-{
-  ATEerror_t Status;
+ * @brief  Check if the LoRa module is working
+ * @param  void
+ * @retval status of the module (ready or not ready)
+ **************************************************************/
+RetCode_t Lora_Init(void) {
+	ATEerror_t Status;
 
-  /*check if the module is working*/
-  Status = Modem_AT_Cmd(AT_CTRL, AT, NULL);
+	/*check if the module is working*/
+	Status = Modem_AT_Cmd(AT_CTRL, AT, NULL);
 #ifdef USE_LRWAN_NS1
-  if (Status == ATCTL_RET_CMD_AT)
+	if (Status == ATCTL_RET_CMD_AT)
 #else
   if (Status == AT_OK)
 #endif
-    /* received Ok from module*/
-    return (MODULE_READY);
-  else
-  {
-    return (MODULE_NO_READY);
-  }
+		/* received Ok from module*/
+		return (MODULE_READY);
+	else {
+		return (MODULE_NO_READY);
+	}
 }
 
-
 /**************************************************************
-  * @brief  reset of the LoRa module
-  * @param  void
-  * @retval void
-  **************************************************************/
-void Lora_Reset(void)
-{
-  /*reset the lora module*/
-  Modem_AT_Cmd(AT_CTRL, AT_RESET, NULL);
+ * @brief  reset of the LoRa module
+ * @param  void
+ * @retval void
+ **************************************************************/
+void Lora_Reset(void) {
+	/*reset the lora module*/
+	Modem_AT_Cmd(AT_CTRL, AT_RESET, NULL);
 
 }
 
 /**************************************************************
-  * @brief  Do a request to establish a LoRa Connection with the gateway
-  * @param  Mode: by OTAA or by ABP
-  * @retval LoRA return code
-  * @Nota param is relevant for USI WM_SG_SM_XX modem/LRWAN_NS1 modem / WL55 modem - Not relevant for MDM32L07X01 modem
-  **************************************************************/
-ATEerror_t Lora_Join(uint8_t Mode)
-{
+ * @brief  Do a request to establish a LoRa Connection with the gateway
+ * @param  Mode: by OTAA or by ABP
+ * @retval LoRA return code
+ * @Nota param is relevant for USI WM_SG_SM_XX modem/LRWAN_NS1 modem / WL55 modem - Not relevant for MDM32L07X01 modem
+ **************************************************************/
+ATEerror_t Lora_Join(uint8_t Mode) {
 #ifdef USE_LRWAN_NS1
-  ATEerror_t Status = ATCTL_RET_IDLE;
-  atctl_data_t dttmp;
-  uint32_t current_st = 0;
+	ATEerror_t Status = ATCTL_RET_IDLE;
+	atctl_data_t dttmp;
+	uint32_t current_st = 0;
 #else
   ATEerror_t Status = AT_END_ERROR;
 #endif
 
-  /******************************************************************/
-  /* In OTAA mode wait JOIN_ACCEPT_DELAY1 cf. LoRaWAN Specification */
-  /* MDM32L07X01:                                                   */
-  /*      - After Join request waits DELAY_FOR_JOIN_STATUS_REQ      */
-  /*      - Then do Join status request to know is nwk joined       */
-  /* WM_SG_SM_XX:                                                   */
-  /*      - Do the Join request                                     */
-  /*      - Then waits asynchronous JoinAccept event                */
-  /*      - if timeout raised before JoinAccept event               */
-  /*      - then Join request Failed                                */
-  /* WL55:                                                          */
-  /*      - Do the Join request                                     */
-  /*      - Then waits asynchronous JoinAccept event                */
-  /*      - if timeout raised before JoinAccept event               */
-  /*      - then Join request Failed                                */
-  /* LRWAN_NS1:                                                     */
-  /*      - After Join request wait for receiving data              */
-  /*      - Then parse data to known JION status                    */
-  /*      - Decide to wait DELAY_FOR_JOIN_STATUS_REQ based on status*/
-  /* Nota: Lora_Join() does the join request                        */
-  /*       afterwhat                                                */
-  /*       Lora_JoinAccept() does the waiting on return event       */
-  /******************************************************************/
+	/******************************************************************/
+	/* In OTAA mode wait JOIN_ACCEPT_DELAY1 cf. LoRaWAN Specification */
+	/* MDM32L07X01:                                                   */
+	/*      - After Join request waits DELAY_FOR_JOIN_STATUS_REQ      */
+	/*      - Then do Join status request to know is nwk joined       */
+	/* WM_SG_SM_XX:                                                   */
+	/*      - Do the Join request                                     */
+	/*      - Then waits asynchronous JoinAccept event                */
+	/*      - if timeout raised before JoinAccept event               */
+	/*      - then Join request Failed                                */
+	/* WL55:                                                          */
+	/*      - Do the Join request                                     */
+	/*      - Then waits asynchronous JoinAccept event                */
+	/*      - if timeout raised before JoinAccept event               */
+	/*      - then Join request Failed                                */
+	/* LRWAN_NS1:                                                     */
+	/*      - After Join request wait for receiving data              */
+	/*      - Then parse data to known JION status                    */
+	/*      - Decide to wait DELAY_FOR_JOIN_STATUS_REQ based on status*/
+	/* Nota: Lora_Join() does the join request                        */
+	/*       afterwhat                                                */
+	/*       Lora_JoinAccept() does the waiting on return event       */
+	/******************************************************************/
 
 #if USE_I_NUCLEO_LRWAN1 || USE_MDM32WL
 
@@ -378,23 +369,21 @@ ATEerror_t Lora_Join(uint8_t Mode)
   }
 #endif
 
-  return (Status);
+	return (Status);
 }
-
 
 #ifdef USE_LRWAN_NS1
 /**************************************************************
-  * @brief  Do a request to reset LoRaWAN AT modem to factory default configuration.
-  * @param void
-  * @retval LoRa return code
-  **************************************************************/
-ATEerror_t Lora_SetDefault(void)
-{
-  ATEerror_t Status;
+ * @brief  Do a request to reset LoRaWAN AT modem to factory default configuration.
+ * @param void
+ * @retval LoRa return code
+ **************************************************************/
+ATEerror_t Lora_SetDefault(void) {
+	ATEerror_t Status;
 
-  Status = Modem_AT_Cmd(AT_CTRL, AT_FDEFAULT, NULL);
+	Status = Modem_AT_Cmd(AT_CTRL, AT_FDEFAULT, NULL);
 
-  return (Status);
+	return (Status);
 }
 
 #else
@@ -440,34 +429,31 @@ ATEerror_t Lora_JoinAccept(void)
 }
 #endif
 /**************************************************************
-  * @brief  Do a request to set the Network join Mode
-  * @param  Mode : OTAA, ABP
-  * @retval LoRa return code
-  **************************************************************/
-ATEerror_t Lora_SetJoinMode(uint8_t Mode)
-{
-  ATEerror_t Status;
+ * @brief  Do a request to set the Network join Mode
+ * @param  Mode : OTAA, ABP
+ * @retval LoRa return code
+ **************************************************************/
+ATEerror_t Lora_SetJoinMode(uint8_t Mode) {
+	ATEerror_t Status;
 
-  /*Set the nwk Join mode */
-  Status = Modem_AT_Cmd(AT_SET, AT_NJM, &Mode);
+	/*Set the nwk Join mode */
+	Status = Modem_AT_Cmd(AT_SET, AT_NJM, &Mode);
 
-  return (Status);
+	return (Status);
 }
 
-
 /**************************************************************
-  * @brief  Do a request to get the Network join Mode
-  * @param  pointer to the Join mode out value
-  * @retval LoRa return code
-  **************************************************************/
-ATEerror_t Lora_GetJoinMode(uint8_t *Mode)
-{
-  ATEerror_t Status;
+ * @brief  Do a request to get the Network join Mode
+ * @param  pointer to the Join mode out value
+ * @retval LoRa return code
+ **************************************************************/
+ATEerror_t Lora_GetJoinMode(uint8_t *Mode) {
+	ATEerror_t Status;
 
-  /*Get the nwk Join mode */
-  Status = Modem_AT_Cmd(AT_GET, AT_NJM, Mode);
+	/*Get the nwk Join mode */
+	Status = Modem_AT_Cmd(AT_GET, AT_NJM, Mode);
 
-  return (Status);
+	return (Status);
 }
 
 #ifdef USE_MDM32WL
@@ -522,81 +508,71 @@ ATEerror_t Lora_GetLocalTime(uint8_t *PtrLTime)
 #endif
 /********* MiB MananagementLora **************/
 
-
 /**************************************************************
-  * @brief  key configuration
-  * @param  KeyType : APPKEY, NWKSKE, APPSKEY
-  * @retval LoRa return code
-  **************************************************************/
-ATEerror_t LoRa_SetKey(ATCmd_t KeyType, uint8_t *PtrKey)
-{
-  ATEerror_t Status;
+ * @brief  key configuration
+ * @param  KeyType : APPKEY, NWKSKE, APPSKEY
+ * @retval LoRa return code
+ **************************************************************/
+ATEerror_t LoRa_SetKey(ATCmd_t KeyType, uint8_t *PtrKey) {
+	ATEerror_t Status;
 
-  /*Set a key type to the LoRa device*/
-  Status = Modem_AT_Cmd(AT_SET, KeyType, PtrKey);
-  return (Status);
+	/*Set a key type to the LoRa device*/
+	Status = Modem_AT_Cmd(AT_SET, KeyType, PtrKey);
+	return (Status);
 }
 
 /**************************************************************
-  * @brief  Request the key type configuration
-  * @param  KeyType : APPKEY, NWKSKE, APPSKEY
-  * @retval LoRa return code
-  **************************************************************/
-ATEerror_t LoRa_GetKey(ATCmd_t KeyType, uint8_t *PtrKey)
-{
-  ATEerror_t Status;
+ * @brief  Request the key type configuration
+ * @param  KeyType : APPKEY, NWKSKE, APPSKEY
+ * @retval LoRa return code
+ **************************************************************/
+ATEerror_t LoRa_GetKey(ATCmd_t KeyType, uint8_t *PtrKey) {
+	ATEerror_t Status;
 
-  /*get the key type from the LoRa device*/
-  Status = Modem_AT_Cmd(AT_GET, KeyType, PtrTempValueFromDeviceKey);
-  if (Status == 0)
-  {
-    AT_VSSCANF((char *)PtrTempValueFromDeviceKey + AT_FRAME_KEY_OFFSET, AT_FRAME_KEY,
-               &PtrKey[0], &PtrKey[1], &PtrKey[2], &PtrKey[3],
-               &PtrKey[4], &PtrKey[5], &PtrKey[6], &PtrKey[7],
-               &PtrKey[8], &PtrKey[9], &PtrKey[10], &PtrKey[11],
-               &PtrKey[12], &PtrKey[13], &PtrKey[14], &PtrKey[15]);
-    return (Status);
-  }
-  else
-  {
-    return (Status);
-  }
+	/*get the key type from the LoRa device*/
+	Status = Modem_AT_Cmd(AT_GET, KeyType, PtrTempValueFromDeviceKey);
+	if (Status == 0) {
+		AT_VSSCANF((char *)PtrTempValueFromDeviceKey + AT_FRAME_KEY_OFFSET,
+				AT_FRAME_KEY, &PtrKey[0], &PtrKey[1], &PtrKey[2], &PtrKey[3],
+				&PtrKey[4], &PtrKey[5], &PtrKey[6], &PtrKey[7], &PtrKey[8],
+				&PtrKey[9], &PtrKey[10], &PtrKey[11], &PtrKey[12], &PtrKey[13],
+				&PtrKey[14], &PtrKey[15]);
+		return (Status);
+	} else {
+		return (Status);
+	}
 }
 
 /**************************************************************
-  * @brief  Set the Application Identifier
-  * @param  pointer to the APPEUI in value
-  * @retval LoRa return code
-  **************************************************************/
-ATEerror_t LoRa_SetAppID(uint8_t *PtrAppID)
-{
-  ATEerror_t Status;
+ * @brief  Set the Application Identifier
+ * @param  pointer to the APPEUI in value
+ * @retval LoRa return code
+ **************************************************************/
+ATEerror_t LoRa_SetAppID(uint8_t *PtrAppID) {
+	ATEerror_t Status;
 
-  Status = Modem_AT_Cmd(AT_SET, AT_APPEUI, PtrAppID);
+	Status = Modem_AT_Cmd(AT_SET, AT_APPEUI, PtrAppID);
 
-  return (Status);
+	return (Status);
 }
 
 /**************************************************************
-  * @brief  Request the Application Identifier
-  * @param  pointer to the APPEUI out value
-  * @retval LoRa return code
-  **************************************************************/
-ATEerror_t LoRa_GetAppID(uint8_t *AppEui)
-{
-  ATEerror_t Status;
+ * @brief  Request the Application Identifier
+ * @param  pointer to the APPEUI out value
+ * @retval LoRa return code
+ **************************************************************/
+ATEerror_t LoRa_GetAppID(uint8_t *AppEui) {
+	ATEerror_t Status;
 
-  Status = Modem_AT_Cmd(AT_GET, AT_APPEUI, PtrTempValueFromDevice);
+	Status = Modem_AT_Cmd(AT_GET, AT_APPEUI, PtrTempValueFromDevice);
 #ifdef USE_LRWAN_NS1
-  uint8_t i = 0;
-  if (Status == ATCTL_RET_CMD_ID)
-  {
-    for (i = 0; i < 8; i ++)
-    {
-      AppEui[i] = dt.id.appeui[i];
-    }
-    return (Status);
-  }
+	uint8_t i = 0;
+	if (Status == ATCTL_RET_CMD_ID) {
+		for (i = 0; i < 8; i++) {
+			AppEui[i] = dt.id.appeui[i];
+		}
+		return (Status);
+	}
 #else
   if (Status == 0)
   {
@@ -624,45 +600,40 @@ ATEerror_t LoRa_GetAppID(uint8_t *AppEui)
     return (Status);
   }
 #endif
-  else
-  {
-    return (Status);
-  }
+	else {
+		return (Status);
+	}
 }
 
 /**************************************************************
-  * @brief  Set the device extended universal identifier
-  * @param  pointer to the DEUI in value
-  * @retval LoRa return code
-  **************************************************************/
-ATEerror_t LoRa_SetDeviceID(uint8_t *PtrDeviceID)
-{
-  ATEerror_t Status;
+ * @brief  Set the device extended universal identifier
+ * @param  pointer to the DEUI in value
+ * @retval LoRa return code
+ **************************************************************/
+ATEerror_t LoRa_SetDeviceID(uint8_t *PtrDeviceID) {
+	ATEerror_t Status;
 
-  Status = Modem_AT_Cmd(AT_SET, AT_DEUI, PtrDeviceID);
+	Status = Modem_AT_Cmd(AT_SET, AT_DEUI, PtrDeviceID);
 
-  return (Status);
+	return (Status);
 }
 /**************************************************************
-  * @brief  Request the device extended universal identifier
-  * @param  pointer to the DEUI out value
-  * @retval LoRa return code
-  **************************************************************/
-ATEerror_t LoRa_GetDeviceID(uint8_t *PtrDeviceID)
-{
-  ATEerror_t Status;
+ * @brief  Request the device extended universal identifier
+ * @param  pointer to the DEUI out value
+ * @retval LoRa return code
+ **************************************************************/
+ATEerror_t LoRa_GetDeviceID(uint8_t *PtrDeviceID) {
+	ATEerror_t Status;
 
-  Status = Modem_AT_Cmd(AT_GET, AT_DEUI, PtrTempValueFromDevice);
+	Status = Modem_AT_Cmd(AT_GET, AT_DEUI, PtrTempValueFromDevice);
 #ifdef USE_LRWAN_NS1
-  uint8_t i = 0;
-  if (Status == ATCTL_RET_CMD_ID)
-  {
-    for (i = 0; i < 8; i ++)
-    {
-      PtrDeviceID[i] = dt.id.deveui[i];
-    }
-    return (Status);
-  }
+	uint8_t i = 0;
+	if (Status == ATCTL_RET_CMD_ID) {
+		for (i = 0; i < 8; i++) {
+			PtrDeviceID[i] = dt.id.deveui[i];
+		}
+		return (Status);
+	}
 #else
   if (Status == 0)
   {
@@ -691,46 +662,40 @@ ATEerror_t LoRa_GetDeviceID(uint8_t *PtrDeviceID)
     return (Status);
   }
 #endif
-  else
-  {
-    return (Status);
-  }
+	else {
+		return (Status);
+	}
 }
 
-
 /**************************************************************
-  * @brief  Set the device address
-  * @param  pointer to the DADDR in value
-  * @retval LoRa return code
-  **************************************************************/
-ATEerror_t LoRa_SetDeviceAddress(uint32_t DeviceAddr)
-{
-  ATEerror_t Status;
+ * @brief  Set the device address
+ * @param  pointer to the DADDR in value
+ * @retval LoRa return code
+ **************************************************************/
+ATEerror_t LoRa_SetDeviceAddress(uint32_t DeviceAddr) {
+	ATEerror_t Status;
 
-  Status = Modem_AT_Cmd(AT_SET, AT_DADDR, &DeviceAddr);
+	Status = Modem_AT_Cmd(AT_SET, AT_DADDR, &DeviceAddr);
 
-  return (Status);
+	return (Status);
 }
 /**************************************************************
-  * @brief  Request the device address
-  * @param  pointer to the DADDR out value
-  * @retval LoRa return code
-  **************************************************************/
-ATEerror_t LoRa_GetDeviceAddress(uint32_t *Value)
-{
-  ATEerror_t Status;
+ * @brief  Request the device address
+ * @param  pointer to the DADDR out value
+ * @retval LoRa return code
+ **************************************************************/
+ATEerror_t LoRa_GetDeviceAddress(uint32_t *Value) {
+	ATEerror_t Status;
 
-  Status = Modem_AT_Cmd(AT_GET, AT_DADDR, PtrValueFromDevice);
+	Status = Modem_AT_Cmd(AT_GET, AT_DADDR, PtrValueFromDevice);
 #ifdef USE_LRWAN_NS1
-  uint8_t i = 0;
-  if (Status == ATCTL_RET_CMD_ID)
-  {
-    for (i = 0; i < 4; i ++)
-    {
-      Value[i] = dt.id.devaddr[i];
-    }
-    return (Status);
-  }
+	uint8_t i = 0;
+	if (Status == ATCTL_RET_CMD_ID) {
+		for (i = 0; i < 4; i++) {
+			Value[i] = dt.id.devaddr[i];
+		}
+		return (Status);
+	}
 #else
   if (Status == 0)
   {
@@ -742,505 +707,439 @@ ATEerror_t LoRa_GetDeviceAddress(uint32_t *Value)
     return (Status);
   }
 #endif
-  else
-  {
-    return (Status);
-  }
+	else {
+		return (Status);
+	}
 }
 
 /**************************************************************
-  * @brief  Set the NetWork ID
-  * @param  NWKID in value
-  * @retval LoRa return code
-  **************************************************************/
-ATEerror_t LoRa_SetNetworkID(uint32_t NetworkID)
-{
-  ATEerror_t Status;
+ * @brief  Set the NetWork ID
+ * @param  NWKID in value
+ * @retval LoRa return code
+ **************************************************************/
+ATEerror_t LoRa_SetNetworkID(uint32_t NetworkID) {
+	ATEerror_t Status;
 
-  Status = Modem_AT_Cmd(AT_SET, AT_NWKID, &NetworkID);
-  return (Status);
+	Status = Modem_AT_Cmd(AT_SET, AT_NWKID, &NetworkID);
+	return (Status);
 }
 
-
 /**************************************************************
-  * @brief  Request the network ID
-  * @param  pointer to the NWKID out value
-  * @retval LoRa return code
-  **************************************************************/
-ATEerror_t LoRa_GetNetworkID(uint32_t *Value)
-{
-  ATEerror_t Status;
+ * @brief  Request the network ID
+ * @param  pointer to the NWKID out value
+ * @retval LoRa return code
+ **************************************************************/
+ATEerror_t LoRa_GetNetworkID(uint32_t *Value) {
+	ATEerror_t Status;
 
-  Status = Modem_AT_Cmd(AT_GET, AT_NWKID, PtrValueFromDevice);
-  if (Status == 0)
-  {
-    AT_VSSCANF((char *)PtrValueFromDevice, "%hhx:%hhx:%hhx:%hhx",
-               &((unsigned char *)(Value))[0],
-               &((unsigned char *)(Value))[1],
-               &((unsigned char *)(Value))[2],
-               &((unsigned char *)(Value))[3]);
-    return (Status);
-  }
-  else
-  {
-    return (Status);
-  }
+	Status = Modem_AT_Cmd(AT_GET, AT_NWKID, PtrValueFromDevice);
+	if (Status == 0) {
+		AT_VSSCANF((char* )PtrValueFromDevice, "%hhx:%hhx:%hhx:%hhx",
+				&((unsigned char* )(Value))[0], &((unsigned char* )(Value))[1],
+				&((unsigned char* )(Value))[2], &((unsigned char* )(Value))[3]);
+		return (Status);
+	} else {
+		return (Status);
+	}
 }
 
 /*************   Network Management *****************/
 
 /**************************************************************
-  * @brief  Do a request to set the adaptive data rate
-  * @param  ADR in value 0(off) / 1(on)
-  * @retval LoRa return code
-  **************************************************************/
-ATEerror_t Lora_SetAdaptiveDataRate(uint8_t Rate)
-{
-  ATEerror_t Status;
+ * @brief  Do a request to set the adaptive data rate
+ * @param  ADR in value 0(off) / 1(on)
+ * @retval LoRa return code
+ **************************************************************/
+ATEerror_t Lora_SetAdaptiveDataRate(uint8_t Rate) {
+	ATEerror_t Status;
 
-  Status = Modem_AT_Cmd(AT_SET, AT_ADR, &Rate);
+	Status = Modem_AT_Cmd(AT_SET, AT_ADR, &Rate);
 
-  return (Status);
+	return (Status);
 }
 
 /**************************************************************
-  * @brief  Do a request to get the adaptive data rate
-  * @param  pointer to ADR out value
-  * @retval LoRa return code
-  **************************************************************/
-ATEerror_t Lora_GetAdaptiveDataRate(uint8_t *Rate)
-{
-  ATEerror_t Status;
+ * @brief  Do a request to get the adaptive data rate
+ * @param  pointer to ADR out value
+ * @retval LoRa return code
+ **************************************************************/
+ATEerror_t Lora_GetAdaptiveDataRate(uint8_t *Rate) {
+	ATEerror_t Status;
 
-  Status = Modem_AT_Cmd(AT_GET, AT_ADR, Rate);
-  return (Status);;
+	Status = Modem_AT_Cmd(AT_GET, AT_ADR, Rate);
+	return (Status);;
 }
 
 /**************************************************************
-  * @brief  Do a request to set the LoRa Class
-  * @param  CLASS in value [0,1,2]
-  * @retval LoRa return code
-  **************************************************************/
-ATEerror_t Lora_SetClass(uint8_t Class)
-{
-  ATEerror_t Status;
+ * @brief  Do a request to set the LoRa Class
+ * @param  CLASS in value [0,1,2]
+ * @retval LoRa return code
+ **************************************************************/
+ATEerror_t Lora_SetClass(uint8_t Class) {
+	ATEerror_t Status;
 
-  Status = Modem_AT_Cmd(AT_SET, AT_CLASS, &Class);
+	Status = Modem_AT_Cmd(AT_SET, AT_CLASS, &Class);
 
-  return (Status);
+	return (Status);
 }
 
 /**************************************************************
-  * @brief  Do a request to get the LoRa class
-  * @param  pointer to CLASS out value
-  * @retval LoRa return code
-  **************************************************************/
-ATEerror_t Lora_GetClass(uint8_t *Class)
-{
-  ATEerror_t Status;
+ * @brief  Do a request to get the LoRa class
+ * @param  pointer to CLASS out value
+ * @retval LoRa return code
+ **************************************************************/
+ATEerror_t Lora_GetClass(uint8_t *Class) {
+	ATEerror_t Status;
 
-  Status = Modem_AT_Cmd(AT_GET, AT_CLASS, Class);
-  return (Status);
+	Status = Modem_AT_Cmd(AT_GET, AT_CLASS, Class);
+	return (Status);
 }
 
 /**************************************************************
-  * @brief  Do a request to set the duty cycle
-  * @brief  only used in test mode
-  * @param  DCS in value 0(disable) / 1(enable)
-  * @retval LoRa return code
-  **************************************************************/
-ATEerror_t Lora_SetDutyCycle(uint8_t DutyCycle)
-{
-  ATEerror_t Status;
+ * @brief  Do a request to set the duty cycle
+ * @brief  only used in test mode
+ * @param  DCS in value 0(disable) / 1(enable)
+ * @retval LoRa return code
+ **************************************************************/
+ATEerror_t Lora_SetDutyCycle(uint8_t DutyCycle) {
+	ATEerror_t Status;
 
-  Status = Modem_AT_Cmd(AT_SET, AT_DCS, &DutyCycle);
+	Status = Modem_AT_Cmd(AT_SET, AT_DCS, &DutyCycle);
 
-  return (Status);
+	return (Status);
 }
 
 /**************************************************************
-  * @brief  Do a request to get the duty cycle
-  * @brief  only used in test mode
-  * @param  pointer to DCS out value
-  * @retval LoRa return code
-  **************************************************************/
-ATEerror_t Lora_GetDutyCycle(uint8_t *DutyCycle)
-{
-  ATEerror_t Status;
+ * @brief  Do a request to get the duty cycle
+ * @brief  only used in test mode
+ * @param  pointer to DCS out value
+ * @retval LoRa return code
+ **************************************************************/
+ATEerror_t Lora_GetDutyCycle(uint8_t *DutyCycle) {
+	ATEerror_t Status;
 
-  Status = Modem_AT_Cmd(AT_GET, AT_DCS, DutyCycle);
-  return (Status);
+	Status = Modem_AT_Cmd(AT_GET, AT_DCS, DutyCycle);
+	return (Status);
 }
 
 /**************************************************************
-  * @brief  Do a request to set the data Rate
-  * @param  DR in value [0,1,2,3,4,5,6,7]
-  *         If use USE_LRWAN_NS1, DR range in 0~15
-  * @retval LoRa return code
-  **************************************************************/
-ATEerror_t Lora_SetDataRate(uint8_t DataRate)
-{
-  ATEerror_t Status;
+ * @brief  Do a request to set the data Rate
+ * @param  DR in value [0,1,2,3,4,5,6,7]
+ *         If use USE_LRWAN_NS1, DR range in 0~15
+ * @retval LoRa return code
+ **************************************************************/
+ATEerror_t Lora_SetDataRate(uint8_t DataRate) {
+	ATEerror_t Status;
 
-  Status = Modem_AT_Cmd(AT_SET, AT_DR, &DataRate);
+	Status = Modem_AT_Cmd(AT_SET, AT_DR, &DataRate);
 
-  return (Status);
+	return (Status);
 }
 
 /**************************************************************
-  * @brief  Do a request to get the data Rate
-  * @param  pointer to DR out value
-  * @retval LoRa return code
-  **************************************************************/
-ATEerror_t Lora_GetDataRate(uint8_t *DataRate)
-{
-  ATEerror_t Status;
+ * @brief  Do a request to get the data Rate
+ * @param  pointer to DR out value
+ * @retval LoRa return code
+ **************************************************************/
+ATEerror_t Lora_GetDataRate(uint8_t *DataRate) {
+	ATEerror_t Status;
 
-  Status = Modem_AT_Cmd(AT_GET, AT_DR, DataRate);
+	Status = Modem_AT_Cmd(AT_GET, AT_DR, DataRate);
 
-  return (Status);
+	return (Status);
 }
 /**************************************************************
-  * @brief  Do a request to set the frame counter
-  * @param  FrameCounterType : FCD, FCU
-  * @retval LoRa return code
-  **************************************************************/
-ATEerror_t LoRa_SetFrameCounter(ATCmd_t FrameCounterType, uint32_t FrameCounternumber)
-{
-  ATEerror_t Status;
+ * @brief  Do a request to set the frame counter
+ * @param  FrameCounterType : FCD, FCU
+ * @retval LoRa return code
+ **************************************************************/
+ATEerror_t LoRa_SetFrameCounter(ATCmd_t FrameCounterType,
+		uint32_t FrameCounternumber) {
+	ATEerror_t Status;
 
-  Status = Modem_AT_Cmd(AT_SET, FrameCounterType, &FrameCounternumber);
-  return (Status);
+	Status = Modem_AT_Cmd(AT_SET, FrameCounterType, &FrameCounternumber);
+	return (Status);
 
 }
 
 /**************************************************************
-  * @brief  Request the frame counter number
-  * @param  frameCounterType : FCD, FCU
-  * @retval LoRa return code
-  **************************************************************/
-ATEerror_t LoRa_GetFrameCounter(ATCmd_t FrameCounterType, uint32_t *FrameCounternumber)
-{
-  ATEerror_t Status;
+ * @brief  Request the frame counter number
+ * @param  frameCounterType : FCD, FCU
+ * @retval LoRa return code
+ **************************************************************/
+ATEerror_t LoRa_GetFrameCounter(ATCmd_t FrameCounterType,
+		uint32_t *FrameCounternumber) {
+	ATEerror_t Status;
 
-  Status = Modem_AT_Cmd(AT_GET, FrameCounterType, PtrValueFromDevice);
-  if (Status == 0)
-  {
-    AT_VSSCANF((char *)PtrValueFromDevice, "%lu", FrameCounternumber);
-    return (Status);
-  }
-  else
-  {
-    return (Status);
-  }
+	Status = Modem_AT_Cmd(AT_GET, FrameCounterType, PtrValueFromDevice);
+	if (Status == 0) {
+		AT_VSSCANF((char* )PtrValueFromDevice, "%lu", FrameCounternumber);
+		return (Status);
+	} else {
+		return (Status);
+	}
 }
 
-
-
-
-
 /**************************************************************
-  * @brief  Do a request to set the join accept delay between
-  * @brief  the end of the Tx and the join Rx#n window
-  * @param  RxWindowType : JN1DL, JN2DL
-  * @retval LoRa return code
-  **************************************************************/
-ATEerror_t LoRa_SetJoinDelayRxWind(ATCmd_t RxWindowType, uint32_t JoinDelayInMs)
-{
-  ATEerror_t Status;
+ * @brief  Do a request to set the join accept delay between
+ * @brief  the end of the Tx and the join Rx#n window
+ * @param  RxWindowType : JN1DL, JN2DL
+ * @retval LoRa return code
+ **************************************************************/
+ATEerror_t LoRa_SetJoinDelayRxWind(ATCmd_t RxWindowType, uint32_t JoinDelayInMs) {
+	ATEerror_t Status;
 
-  Status = Modem_AT_Cmd(AT_SET, RxWindowType, &JoinDelayInMs);
-  return (Status);
+	Status = Modem_AT_Cmd(AT_SET, RxWindowType, &JoinDelayInMs);
+	return (Status);
 
 }
 
 /**************************************************************
-  * @brief  Do a request to get the join accept delay between
-  * @brief  the end of the Tx and the join Rx#n window
-  * @param  RxWindowType : JN1DL, JN2DL
-  * @retval LoRa return code
-  **************************************************************/
-ATEerror_t LoRa_GetJoinDelayRxWind(ATCmd_t RxWindowType, uint32_t *JoinDelayInMs)
-{
-  ATEerror_t Status;
+ * @brief  Do a request to get the join accept delay between
+ * @brief  the end of the Tx and the join Rx#n window
+ * @param  RxWindowType : JN1DL, JN2DL
+ * @retval LoRa return code
+ **************************************************************/
+ATEerror_t LoRa_GetJoinDelayRxWind(ATCmd_t RxWindowType,
+		uint32_t *JoinDelayInMs) {
+	ATEerror_t Status;
 
-  Status = Modem_AT_Cmd(AT_GET, RxWindowType, PtrValueFromDevice);
-  if (Status == 0)
-  {
-    AT_VSSCANF((char *)PtrValueFromDevice, "%lu", JoinDelayInMs);
-    return (Status);
-  }
-  else
-  {
-    return (Status);
-  }
+	Status = Modem_AT_Cmd(AT_GET, RxWindowType, PtrValueFromDevice);
+	if (Status == 0) {
+		AT_VSSCANF((char* )PtrValueFromDevice, "%lu", JoinDelayInMs);
+		return (Status);
+	} else {
+		return (Status);
+	}
 }
 
 /**************************************************************
-  * @brief  Do a request to set the Public Network mode
-  * @param  PNM in value 0(off) / 1(on)
-  * @retval LoRa return code
-  **************************************************************/
-ATEerror_t Lora_SetPublicNetworkMode(uint8_t NetworkMode)
-{
-  ATEerror_t Status;
+ * @brief  Do a request to set the Public Network mode
+ * @param  PNM in value 0(off) / 1(on)
+ * @retval LoRa return code
+ **************************************************************/
+ATEerror_t Lora_SetPublicNetworkMode(uint8_t NetworkMode) {
+	ATEerror_t Status;
 
-  Status = Modem_AT_Cmd(AT_SET, AT_PNM, &NetworkMode);
+	Status = Modem_AT_Cmd(AT_SET, AT_PNM, &NetworkMode);
 
-  return (Status);
+	return (Status);
 }
 /**************************************************************
-  * @brief  Do a request to get the Public Network mode
-  * @param  pointer to PNM out value
-  * @retval LoRa return code
-  **************************************************************/
-ATEerror_t Lora_GetPublicNetworkMode(uint8_t *NetworkMode)
-{
-  ATEerror_t Status;
+ * @brief  Do a request to get the Public Network mode
+ * @param  pointer to PNM out value
+ * @retval LoRa return code
+ **************************************************************/
+ATEerror_t Lora_GetPublicNetworkMode(uint8_t *NetworkMode) {
+	ATEerror_t Status;
 
-  Status = Modem_AT_Cmd(AT_GET, AT_PNM, NetworkMode);
-  return (Status);
+	Status = Modem_AT_Cmd(AT_GET, AT_PNM, NetworkMode);
+	return (Status);
 }
 
 /**************************************************************
-  * @brief  Do a request to set the delay between the end of the Tx
-  * @brief  the end of the Tx and the join Rx#n window
-  * @param  RxWindowType : RX1DL, RX2DL
-  * @retval LoRa return code
-  **************************************************************/
-ATEerror_t LoRa_SetDelayRxWind(ATCmd_t RxWindowType, uint32_t RxDelayInMs)
-{
-  ATEerror_t Status;
+ * @brief  Do a request to set the delay between the end of the Tx
+ * @brief  the end of the Tx and the join Rx#n window
+ * @param  RxWindowType : RX1DL, RX2DL
+ * @retval LoRa return code
+ **************************************************************/
+ATEerror_t LoRa_SetDelayRxWind(ATCmd_t RxWindowType, uint32_t RxDelayInMs) {
+	ATEerror_t Status;
 
-  Status = Modem_AT_Cmd(AT_SET, RxWindowType, &RxDelayInMs);
-  return (Status);
+	Status = Modem_AT_Cmd(AT_SET, RxWindowType, &RxDelayInMs);
+	return (Status);
 
 }
 
 /**************************************************************
-  * @brief  Do a request to get the delay between the end of the Tx
-  * @brief  the end of the Tx and the join Rx#n window
-  * @param  RxWindowType : RX1DL, RX2DL
-  * @retval LoRa return code
-  **************************************************************/
-ATEerror_t LoRa_GetDelayRxWind(ATCmd_t RxWindowType, uint32_t *RxDelayInMs)
-{
-  ATEerror_t Status;
+ * @brief  Do a request to get the delay between the end of the Tx
+ * @brief  the end of the Tx and the join Rx#n window
+ * @param  RxWindowType : RX1DL, RX2DL
+ * @retval LoRa return code
+ **************************************************************/
+ATEerror_t LoRa_GetDelayRxWind(ATCmd_t RxWindowType, uint32_t *RxDelayInMs) {
+	ATEerror_t Status;
 
-  Status = Modem_AT_Cmd(AT_GET, RxWindowType, PtrValueFromDevice);
-  if (Status == 0)
-  {
-    AT_VSSCANF((char *)PtrValueFromDevice, "%lu", RxDelayInMs);
-    return (Status);
-  }
-  else
-  {
-    return (Status);
-  }
-}
-
-
-
-
-/**************************************************************
-  * @brief  Set the frequency of the Rx2 window
-  * @param  pointer to the RX2FQ in value
-  * @retval LoRa return code
-  ************************************************************
-  **/
-ATEerror_t LoRa_SetFreqRxWind2(uint32_t Rx2WindFrequency)
-{
-  ATEerror_t Status;
-
-  Status = Modem_AT_Cmd(AT_SET, AT_RX2FQ, &Rx2WindFrequency);
-  return (Status);
-}
-
-
-/**************************************************************
-  * @brief  Request the frequency of the Rx2 window
-  * @param  pointer to the RX2FQ out value
-  * @retval LoRa return code
-  **************************************************************/
-ATEerror_t LoRa_GetFreqRxWind2(uint32_t *Rx2WindFrequency)
-{
-  ATEerror_t Status;
-
-  Status = Modem_AT_Cmd(AT_GET, AT_RX2FQ, PtrValueFromDevice);
-  if (Status == 0)
-  {
-    AT_VSSCANF((char *)PtrValueFromDevice, "%lu", Rx2WindFrequency);
-    return (Status);
-  }
-  else
-  {
-    return (Status);
-  }
+	Status = Modem_AT_Cmd(AT_GET, RxWindowType, PtrValueFromDevice);
+	if (Status == 0) {
+		AT_VSSCANF((char* )PtrValueFromDevice, "%lu", RxDelayInMs);
+		return (Status);
+	} else {
+		return (Status);
+	}
 }
 
 /**************************************************************
-  * @brief  Do a request to set the transmit Tx power
-  * @param  TXP in value [0,1,2,3,4,5]
-  *         If defined USE_LRWAN_NS1, TXP range in TX_POWER_6_DBM ~ TX_POWER_20_DBM
-  * @retval LoRa return code
-  **************************************************************/
-ATEerror_t Lora_SetTxPower(uint8_t TransmitTxPower)
-{
-  ATEerror_t Status;
+ * @brief  Set the frequency of the Rx2 window
+ * @param  pointer to the RX2FQ in value
+ * @retval LoRa return code
+ ************************************************************
+ **/
+ATEerror_t LoRa_SetFreqRxWind2(uint32_t Rx2WindFrequency) {
+	ATEerror_t Status;
 
-  Status = Modem_AT_Cmd(AT_SET, AT_TXP, &TransmitTxPower);
-
-  return (Status);
-}
-/**************************************************************
-  * @brief  Do a request to get the transmit Tx Power
-  * @param  pointer to TXP out value
-  * @retval LoRa return code
-  **************************************************************/
-ATEerror_t Lora_GetTxPower(uint8_t *TransmitTxPower)
-{
-  ATEerror_t Status;
-
-  Status = Modem_AT_Cmd(AT_GET, AT_TXP, TransmitTxPower);
-  return (Status);
-}
-/**************************************************************
-  * @brief  Do a request to set the data Rate of Rx2 window
-  * @param  RX2DR in value [0,1,2,3,4,5,6,7]
-  * @retval LoRa return code
-  **************************************************************/
-ATEerror_t Lora_SetDataRateRxWind2(uint8_t DataRateRxWind2)
-{
-  ATEerror_t Status;
-
-  Status = Modem_AT_Cmd(AT_SET, AT_RX2DR, &DataRateRxWind2);
-  return (Status);
+	Status = Modem_AT_Cmd(AT_SET, AT_RX2FQ, &Rx2WindFrequency);
+	return (Status);
 }
 
+/**************************************************************
+ * @brief  Request the frequency of the Rx2 window
+ * @param  pointer to the RX2FQ out value
+ * @retval LoRa return code
+ **************************************************************/
+ATEerror_t LoRa_GetFreqRxWind2(uint32_t *Rx2WindFrequency) {
+	ATEerror_t Status;
+
+	Status = Modem_AT_Cmd(AT_GET, AT_RX2FQ, PtrValueFromDevice);
+	if (Status == 0) {
+		AT_VSSCANF((char* )PtrValueFromDevice, "%lu", Rx2WindFrequency);
+		return (Status);
+	} else {
+		return (Status);
+	}
+}
 
 /**************************************************************
-  * @brief  Do a request to get the data Rate of Rx2 window
-  * @param  pointer to RX2DR out value
-  * @retval LoRa return code
-  **************************************************************/
-ATEerror_t Lora_GetDataRateRxWind2(uint8_t *DataRateRxWind2)
-{
-  ATEerror_t Status;
+ * @brief  Do a request to set the transmit Tx power
+ * @param  TXP in value [0,1,2,3,4,5]
+ *         If defined USE_LRWAN_NS1, TXP range in TX_POWER_6_DBM ~ TX_POWER_20_DBM
+ * @retval LoRa return code
+ **************************************************************/
+ATEerror_t Lora_SetTxPower(uint8_t TransmitTxPower) {
+	ATEerror_t Status;
 
-  Status = Modem_AT_Cmd(AT_GET, AT_RX2DR, DataRateRxWind2);
-  return (Status);
+	Status = Modem_AT_Cmd(AT_SET, AT_TXP, &TransmitTxPower);
+
+	return (Status);
+}
+/**************************************************************
+ * @brief  Do a request to get the transmit Tx Power
+ * @param  pointer to TXP out value
+ * @retval LoRa return code
+ **************************************************************/
+ATEerror_t Lora_GetTxPower(uint8_t *TransmitTxPower) {
+	ATEerror_t Status;
+
+	Status = Modem_AT_Cmd(AT_GET, AT_TXP, TransmitTxPower);
+	return (Status);
+}
+/**************************************************************
+ * @brief  Do a request to set the data Rate of Rx2 window
+ * @param  RX2DR in value [0,1,2,3,4,5,6,7]
+ * @retval LoRa return code
+ **************************************************************/
+ATEerror_t Lora_SetDataRateRxWind2(uint8_t DataRateRxWind2) {
+	ATEerror_t Status;
+
+	Status = Modem_AT_Cmd(AT_SET, AT_RX2DR, &DataRateRxWind2);
+	return (Status);
+}
+
+/**************************************************************
+ * @brief  Do a request to get the data Rate of Rx2 window
+ * @param  pointer to RX2DR out value
+ * @retval LoRa return code
+ **************************************************************/
+ATEerror_t Lora_GetDataRateRxWind2(uint8_t *DataRateRxWind2) {
+	ATEerror_t Status;
+
+	Status = Modem_AT_Cmd(AT_GET, AT_RX2DR, DataRateRxWind2);
+	return (Status);
 }
 
 #ifdef USE_LRWAN_NS1
 /**************************************************************
-  * @brief  Do a request to set the band plan
-  * @param  BandPlan
-  * @retval LoRa return code
-  **************************************************************/
-ATEerror_t Lora_SetDeviceBand(uint8_t DeviceBand)
-{
-  ATEerror_t Status;
+ * @brief  Do a request to set the band plan
+ * @param  BandPlan
+ * @retval LoRa return code
+ **************************************************************/
+ATEerror_t Lora_SetDeviceBand(uint8_t DeviceBand) {
+	ATEerror_t Status;
 
-  Status = Modem_AT_Cmd(AT_SET, AT_BAND, &DeviceBand);
-  return (Status);
+	Status = Modem_AT_Cmd(AT_SET, AT_BAND, &DeviceBand);
+	return (Status);
 }
 
 /**************************************************************
-  * @brief  Do a request to set the data Rate of Rx2 window
-  * @param  Freq: Frequency
-  * @param  DRoSF: Spread factor value or date rate value
-  * @Param  BW: Bandwidth
-  * @note   When param BW is 0, the param DRoSF is date rate.
-  * @note   When param BW is not 0, the param DRoSF is spread factor
-  * @retval LoRa return code
-  **************************************************************/
-ATEerror_t Lora_SetRxWind2(float Freq, uint8_t DRoSF, uint16_t BW)
-{
-  ATEerror_t Status;
-  char str_dr[50] = {0};
-  if (BW == 0)
-  {
-    sprintf(str_dr, "%.1f,%d", Freq, DRoSF);
-    Status = Modem_AT_Cmd(AT_SET, AT_RX2, str_dr);
-  }
-  else
-  {
-    sprintf(str_dr, "%.1f,%d,%d", Freq, DRoSF, BW);
-    Status = Modem_AT_Cmd(AT_SET, AT_RX2, str_dr);
-  }
+ * @brief  Do a request to set the data Rate of Rx2 window
+ * @param  Freq: Frequency
+ * @param  DRoSF: Spread factor value or date rate value
+ * @Param  BW: Bandwidth
+ * @note   When param BW is 0, the param DRoSF is date rate.
+ * @note   When param BW is not 0, the param DRoSF is spread factor
+ * @retval LoRa return code
+ **************************************************************/
+ATEerror_t Lora_SetRxWind2(float Freq, uint8_t DRoSF, uint16_t BW) {
+	ATEerror_t Status;
+	char str_dr[50] = { 0 };
+	if (BW == 0) {
+		sprintf(str_dr, "%.1f,%d", Freq, DRoSF);
+		Status = Modem_AT_Cmd(AT_SET, AT_RX2, str_dr);
+	} else {
+		sprintf(str_dr, "%.1f,%d,%d", Freq, DRoSF, BW);
+		Status = Modem_AT_Cmd(AT_SET, AT_RX2, str_dr);
+	}
 
-  return (Status);
+	return (Status);
 }
 
 /**************************************************************
-  * @brief  Do a request to set port
-  * @param  port
-  * @retval LoRa return code
-  **************************************************************/
-ATEerror_t Lora_SetPort(uint8_t port)
-{
-  ATEerror_t Status;
-  Status = Modem_AT_Cmd(AT_SET, AT_PORT, &port);
+ * @brief  Do a request to set port
+ * @param  port
+ * @retval LoRa return code
+ **************************************************************/
+ATEerror_t Lora_SetPort(uint8_t port) {
+	ATEerror_t Status;
+	Status = Modem_AT_Cmd(AT_SET, AT_PORT, &port);
 
-  return (Status);
+	return (Status);
 }
 
 /**************************************************************
-  * @brief  Do a request to get the maximum payload length which is supported to send according to current data rate
-  * @param len point to the length out value
-  * @retval LoRa return code
-  **************************************************************/
-ATEerror_t Lora_GetLwLEN(uint8_t *len)
-{
-  ATEerror_t Status;
+ * @brief  Do a request to get the maximum payload length which is supported to send according to current data rate
+ * @param len point to the length out value
+ * @retval LoRa return code
+ **************************************************************/
+ATEerror_t Lora_GetLwLEN(uint8_t *len) {
+	ATEerror_t Status;
 
-  Status = Modem_AT_Cmd(AT_GET, AT_LEN, len);
+	Status = Modem_AT_Cmd(AT_GET, AT_LEN, len);
 
-  if (Status == ATCTL_RET_CMD_LW)
-  {
-    *len = dt.lw.len;
-  }
+	if (Status == ATCTL_RET_CMD_LW) {
+		*len = dt.lw.len;
+	}
 
-  return (Status);
+	return (Status);
 }
 
 #endif
 
 /************ Data Path Management ***************/
 /**************************************************************
-  * @brief  Do a request to get the battery level of the modem (slave)
-  * @param  BAT in value
-  *              0:    battery connected to external power supply
-  *       [1..254]:    1 being at minimum and 254 being at maximum
-  *             255:    not able to measure the battery level
-  * @retval LoRa return code
-  **************************************************************/
-ATEerror_t Lora_GetBatLevel(uint32_t *BatLevel)
-{
-  ATEerror_t Status;
+ * @brief  Do a request to get the battery level of the modem (slave)
+ * @param  BAT in value
+ *              0:    battery connected to external power supply
+ *       [1..254]:    1 being at minimum and 254 being at maximum
+ *             255:    not able to measure the battery level
+ * @retval LoRa return code
+ **************************************************************/
+ATEerror_t Lora_GetBatLevel(uint32_t *BatLevel) {
+	ATEerror_t Status;
 
 #ifdef USE_LRWAN_NS1
-  Status = Modem_AT_Cmd(AT_GET, AT_VDD, BatLevel);
-  if (Status == ATCTL_RET_CMD_VDD)
-  {
-    if (dt.vdd > 3.3)
-    {
-      *BatLevel = 254;
-    }
-    else if (dt.vdd < 1.8)
-    {
-      *BatLevel = 1;
-    }
-    else
-    {
-      *BatLevel = (uint32_t)((dt.vdd - 1.8) / 1.5 * 254);
-    }
-    return (Status);
-  }
-  else
-  {
-    return (Status);
-  }
+	Status = Modem_AT_Cmd(AT_GET, AT_VDD, BatLevel);
+	if (Status == ATCTL_RET_CMD_VDD) {
+		if (dt.vdd > 3.3) {
+			*BatLevel = 254;
+		} else if (dt.vdd < 1.8) {
+			*BatLevel = 1;
+		} else {
+			*BatLevel = (uint32_t) ((dt.vdd - 1.8) / 1.5 * 254);
+		}
+		return (Status);
+	} else {
+		return (Status);
+	}
 #else
   Status = Modem_AT_Cmd(AT_GET, AT_BAT, PtrValueFromDevice);
   if (Status == 0)
@@ -1256,30 +1155,28 @@ ATEerror_t Lora_GetBatLevel(uint32_t *BatLevel)
 }
 
 /**************************************************************
-  * @brief  Send text data to a giving prot number
-  * @note   RisingHF module need to set port number or use the default port number 8
-  * @param  SEND in value
-  * @retval LoRa return code
-  **************************************************************/
-ATEerror_t Lora_SendData(sSendDataString_t *PtrStructData)
-{
-  ATEerror_t Status;
+ * @brief  Send text data to a giving prot number
+ * @note   RisingHF module need to set port number or use the default port number 8
+ * @param  SEND in value
+ * @retval LoRa return code
+ **************************************************************/
+ATEerror_t Lora_SendData(sSendDataString_t *PtrStructData) {
+	ATEerror_t Status;
 
-  Status = Modem_AT_Cmd(AT_SET, AT_SEND, PtrStructData);
+	Status = Modem_AT_Cmd(AT_SET, AT_SEND, PtrStructData);
 #ifdef USE_LRWAN_NS1
-  Status = Lora_Send();
+	Status = Lora_Send();
 #endif
-  return (Status);
+	return (Status);
 }
 
 /**************************************************************
-  * @brief  Send binary data to a giving port number
-  * @param  SENDB in value ( USE_MDM32L07X01) SEND in value ( USE_I_NUCLEO_LRWAN1)
-  * @retval LoRa return code
-  **************************************************************/
-ATEerror_t Lora_SendDataBin(sSendDataBinary_t *PtrStructData)
-{
-  ATEerror_t Status;
+ * @brief  Send binary data to a giving port number
+ * @param  SENDB in value ( USE_MDM32L07X01) SEND in value ( USE_I_NUCLEO_LRWAN1)
+ * @retval LoRa return code
+ **************************************************************/
+ATEerror_t Lora_SendDataBin(sSendDataBinary_t *PtrStructData) {
+	ATEerror_t Status;
 
 #ifdef USE_MDM32L07X01
   Status = Modem_AT_Cmd(AT_SET, AT_SENDB, PtrStructData);
@@ -1291,171 +1188,155 @@ ATEerror_t Lora_SendDataBin(sSendDataBinary_t *PtrStructData)
   Status = Modem_AT_Cmd(AT_SET, AT_SENDB, PtrStructData);
   Status = Lora_Send();
 #endif
-  return (Status);
+	return (Status);
 }
 
 #ifdef USE_LRWAN_NS1
 /**************************************************************
-  * @brief  Handler after the Send_msg command executed
-  * @param  void
-  * @retval LoRA return code
-  **************************************************************/
-static ATEerror_t Lora_Send(void)
-{
-  uint32_t current_st = 0;
-  record_num = 0;
-  ATEerror_t Status = ATCTL_RET_IDLE;
-  atctl_data_t dttmp;
+ * @brief  Handler after the Send_msg command executed
+ * @param  void
+ * @retval LoRA return code
+ **************************************************************/
+static ATEerror_t Lora_Send(void) {
+	uint32_t current_st = 0;
+	record_num = 0;
+	ATEerror_t Status = ATCTL_RET_IDLE;
+	atctl_data_t dttmp;
 
-  if ((dt.msg.sta != ATCTL_MSG_START) && (dt.msg.sta != ATCTL_MSG_WAIT_ACK))
-  {
-    return Status;
-  }
+	if ((dt.msg.sta != ATCTL_MSG_START) && (dt.msg.sta != ATCTL_MSG_WAIT_ACK)) {
+		return Status;
+	}
 
-  current_st = UTIL_TIMER_GetCurrentTime();
-  while (1)
-  {
-    at_cmd_receive_evt();
-    if (record_num)
-    {
-      break;
-    }
+	current_st = UTIL_TIMER_GetCurrentTime();
+	while (1) {
+		at_cmd_receive_evt();
+		if (record_num) {
+			break;
+		}
 
-    if (UTIL_TIMER_GetElapsedTime(current_st) > 10000)
-    {
-      break;
-    }
-  }
+		if (UTIL_TIMER_GetElapsedTime(current_st) > 10000) {
+			break;
+		}
+	}
 
 #ifdef CMD_DEBUG
-  HAL_UART_Transmit(&huart2, (uint8_t *)response, strlen((const char *)response), 5000);
+	HAL_UART_Transmit(&huart2, (uint8_t*) response,
+			strlen((const char*) response), 5000);
 #endif
 
-  Status = atctl_rx(&dt, 300);
+	Status = atctl_rx(&dt, 300);
 
-  if (Status == ATCTL_RET_CMD_MSG)
-  {
-    switch (dt.msg.sta)
-    {
-      case ATCTL_MSG_DONE:
-        break;
-      case ATCTL_MSG_RX:
-      case ATCTL_MSG_RXWIN:
-      case ATCTL_MSG_ACK_RECEIVED:
-      case ATCTL_MSG_MACCMD:
-        dt.msg.sta = ATCTL_MSG_DONE;
-        do
-        {
-          Status = atctl_rx(&dttmp, ATCTL_RX_TIMEOUT);
-          if (Status != ATCTL_RET_CMD_MSG)
-          {
-            return ATCTL_RET_CMD_MSG;
-          }
-          switch (dttmp.msg.sta)
-          {
-            case ATCTL_MSG_RX:
-              dt.msg.port = dttmp.msg.port;
-              dt.msg.buf = dttmp.msg.buf;
-              dt.msg.size = dttmp.msg.size;
-              break;
-            case ATCTL_MSG_RXWIN:
-              dt.msg.win = dttmp.msg.win;
-              dt.msg.snr = dttmp.msg.snr;
-              dt.msg.rssi = dttmp.msg.rssi;
-              break;
-            case ATCTL_MSG_ACK_RECEIVED:
-              dt.msg.ack = true;
-              break;
-            case ATCTL_MSG_MACCMD:
-              break;
-            case ATCTL_MSG_DONE:
-              break;
-            default:
-              return ATCTL_RET_CMD_MSG;
-          }
-        } while (dttmp.msg.sta != ATCTL_MSG_DONE);
-        break;
-      default:
-        break;
-    }
-  }
+	if (Status == ATCTL_RET_CMD_MSG) {
+		switch (dt.msg.sta) {
+		case ATCTL_MSG_DONE:
+			break;
+		case ATCTL_MSG_RX:
+		case ATCTL_MSG_RXWIN:
+		case ATCTL_MSG_ACK_RECEIVED:
+		case ATCTL_MSG_MACCMD:
+			dt.msg.sta = ATCTL_MSG_DONE;
+			do {
+				Status = atctl_rx(&dttmp, ATCTL_RX_TIMEOUT);
+				if (Status != ATCTL_RET_CMD_MSG) {
+					return ATCTL_RET_CMD_MSG;
+				}
+				switch (dttmp.msg.sta) {
+				case ATCTL_MSG_RX:
+					dt.msg.port = dttmp.msg.port;
+					dt.msg.buf = dttmp.msg.buf;
+					dt.msg.size = dttmp.msg.size;
+					break;
+				case ATCTL_MSG_RXWIN:
+					dt.msg.win = dttmp.msg.win;
+					dt.msg.snr = dttmp.msg.snr;
+					dt.msg.rssi = dttmp.msg.rssi;
+					break;
+				case ATCTL_MSG_ACK_RECEIVED:
+					dt.msg.ack = true;
+					break;
+				case ATCTL_MSG_MACCMD:
+					break;
+				case ATCTL_MSG_DONE:
+					break;
+				default:
+					return ATCTL_RET_CMD_MSG;
+				}
+			} while (dttmp.msg.sta != ATCTL_MSG_DONE);
+			break;
+		default:
+			break;
+		}
+	}
 
-  return Status;
+	return Status;
 }
 
 /**************************************************************
-  * @brief  Do a request to get rx data
-  * @brief  received by the Slave
-  * @note   Used in CLASS C, and the rx data is stored in "dt.msg"
-  * @param  void
-  * @retval LoRa return code
-  **************************************************************/
-ATEerror_t Lora_ReceiveData(void)
-{
-  ATEerror_t Status = ATCTL_RET_CMD_ERR;
-  atctl_data_t dttmp;
+ * @brief  Do a request to get rx data
+ * @brief  received by the Slave
+ * @note   Used in CLASS C, and the rx data is stored in "dt.msg"
+ * @param  void
+ * @retval LoRa return code
+ **************************************************************/
+ATEerror_t Lora_ReceiveData(void) {
+	ATEerror_t Status = ATCTL_RET_CMD_ERR;
+	atctl_data_t dttmp;
 
-  at_cmd_receive_evt();
+	at_cmd_receive_evt();
 
-  if (response[0] != '\0')
-  {
-    memset(&dt, 0, sizeof(atctl_data_t));
-    /*handle  and parse the rx data*/
-    Status = atctl_rx(&dt, 300);
+	if (response[0] != '\0') {
+		memset(&dt, 0, sizeof(atctl_data_t));
+		/*handle  and parse the rx data*/
+		Status = atctl_rx(&dt, 300);
 
-    if (Status == ATCTL_RET_CMD_MSG)
-    {
-      switch (dt.msg.sta)
-      {
-        case ATCTL_MSG_DONE:
-          break;
-        case ATCTL_MSG_RX:
-        case ATCTL_MSG_RXWIN:
-        case ATCTL_MSG_ACK_RECEIVED:
-        case ATCTL_MSG_MACCMD:
-          dt.msg.sta = ATCTL_MSG_DONE;
-          do
-          {
-            Status = atctl_rx(&dttmp, ATCTL_RX_TIMEOUT);
-            if (Status != ATCTL_RET_CMD_MSG)
-            {
-              return ATCTL_RET_CMD_MSG;
-            }
-            switch (dttmp.msg.sta)
-            {
-              case ATCTL_MSG_RX:
-                dt.msg.port = dttmp.msg.port;
-                dt.msg.buf = dttmp.msg.buf;
-                dt.msg.size = dttmp.msg.size;
-                break;
-              case ATCTL_MSG_RXWIN:
-                dt.msg.win = dttmp.msg.win;
-                dt.msg.snr = dttmp.msg.snr;
-                dt.msg.rssi = dttmp.msg.rssi;
-                break;
-              case ATCTL_MSG_ACK_RECEIVED:
-                dt.msg.ack = true;
-                break;
-              case ATCTL_MSG_MACCMD:
-                break;
-              case ATCTL_MSG_DONE:
-                break;
-              default:
-                return ATCTL_RET_CMD_MSG;
-            }
-          } while (dttmp.msg.sta != ATCTL_MSG_DONE);
-          break;
-        default:
-          break;
-      }
-    }
+		if (Status == ATCTL_RET_CMD_MSG) {
+			switch (dt.msg.sta) {
+			case ATCTL_MSG_DONE:
+				break;
+			case ATCTL_MSG_RX:
+			case ATCTL_MSG_RXWIN:
+			case ATCTL_MSG_ACK_RECEIVED:
+			case ATCTL_MSG_MACCMD:
+				dt.msg.sta = ATCTL_MSG_DONE;
+				do {
+					Status = atctl_rx(&dttmp, ATCTL_RX_TIMEOUT);
+					if (Status != ATCTL_RET_CMD_MSG) {
+						return ATCTL_RET_CMD_MSG;
+					}
+					switch (dttmp.msg.sta) {
+					case ATCTL_MSG_RX:
+						dt.msg.port = dttmp.msg.port;
+						dt.msg.buf = dttmp.msg.buf;
+						dt.msg.size = dttmp.msg.size;
+						break;
+					case ATCTL_MSG_RXWIN:
+						dt.msg.win = dttmp.msg.win;
+						dt.msg.snr = dttmp.msg.snr;
+						dt.msg.rssi = dttmp.msg.rssi;
+						break;
+					case ATCTL_MSG_ACK_RECEIVED:
+						dt.msg.ack = true;
+						break;
+					case ATCTL_MSG_MACCMD:
+						break;
+					case ATCTL_MSG_DONE:
+						break;
+					default:
+						return ATCTL_RET_CMD_MSG;
+					}
+				} while (dttmp.msg.sta != ATCTL_MSG_DONE);
+				break;
+			default:
+				break;
+			}
+		}
 
 #if defined CMD_DEBUG
-    at_printf_send((uint8_t *)response, strlen(response));
+		at_printf_send((uint8_t*) response, strlen(response));
 #endif
-  }
+	}
 
-  return Status;
+	return Status;
 }
 
 #else
@@ -1893,8 +1774,6 @@ ATEerror_t Lora_UpdateConfigTable(void)
 
 #endif
 
-
-
 /*********** Finate State Machine for LoRa Modem management *************/
 #ifdef USE_LRWAN_NS1
 /* For test purpose -- node's attributes declared at gateway level*/
@@ -1907,83 +1786,73 @@ ATEerror_t Lora_UpdateConfigTable(void)
 #endif
 
 /******************************************************************************
-  * @Brief lora Modem state machine
-  * @param void
-  * @retval None
-  ******************************************************************************/
-void Lora_fsm(void)
-{
-  RetCode_t LoraModuleRetCode;
-  ATEerror_t LoraCmdRetCode;
-  uint8_t devEui[8], OutdevEui[8];
-  uint8_t appEui[8], OutappEui[8];
-  int i, j;
+ * @Brief lora Modem state machine
+ * @param void
+ * @retval None
+ ******************************************************************************/
+void Lora_fsm(void) {
+	RetCode_t LoraModuleRetCode;
+	ATEerror_t LoraCmdRetCode;
+	uint8_t devEui[8], OutdevEui[8];
+	uint8_t appEui[8], OutappEui[8];
+	int i, j;
 
-  switch (DeviceState)
-  {
-    case DEVICE_INIT:
-    {
-      /* Check if the LoRa Modem is ready to work*/
+	switch (DeviceState) {
+	case DEVICE_INIT: {
+		/* Check if the LoRa Modem is ready to work*/
 
-      LoraModuleRetCode = Lora_Init();
+		LoraModuleRetCode = Lora_Init();
 
-      if (LoraModuleRetCode == MODULE_READY)
-      {
-        /* get the embedded DevEUI of the modem*/
-        LoRa_GetDeviceID(&devEui[0]);
+		LoraDriverCallbacks->SensorMeasureData(&SendDataBinary);
 
-        /* get the embedded AppEUI */
-        LoRa_GetAppID(&appEui[0]);
+		if (LoraModuleRetCode == MODULE_READY) {
+			/* get the embedded DevEUI of the modem*/
+			LoRa_GetDeviceID(&devEui[0]);
 
-        /* read eeprom to see if DevEUI is already store or not store*/
-        for (j = 0; j <= 7; j++)
-        {
-          EE_Read(0, j, &OutdevEui[j]);
-        }
+			/* get the embedded AppEUI */
+			LoRa_GetAppID(&appEui[0]);
 
-        /* read eeprom to see if AppEUI is already store or not store*/
-        for (j = 0; j <= 7; j++)
-        {
-          EE_Read(0, (8 + j), &OutappEui[j]);
-        }
+			/* read eeprom to see if DevEUI is already store or not store*/
+			for (j = 0; j <= 7; j++) {
+				EE_Read(0, j, &OutdevEui[j]);
+			}
 
+			/* read eeprom to see if AppEUI is already store or not store*/
+			for (j = 0; j <= 7; j++) {
+				EE_Read(0, (8 + j), &OutappEui[j]);
+			}
 
-        if (EE_compareArrays(&devEui[0], &OutdevEui[0], 8) == 0)
-        {
-          /* store the DevEUI in eeprom - see DATA_EEPROM_BASE*/
-          for (i = 0; i <= 7; i++)
-          {
-            EE_Write(0, i, devEui[i]);
-          }
-        }
+			if (EE_compareArrays(&devEui[0], &OutdevEui[0], 8) == 0) {
+				/* store the DevEUI in eeprom - see DATA_EEPROM_BASE*/
+				for (i = 0; i <= 7; i++) {
+					EE_Write(0, i, devEui[i]);
+				}
+			}
 
-        if (EE_compareArrays(&appEui[0], &OutappEui[0], 8) == 0)
-        {
-          /* store the appEUI in eeprom - see DATA_EEPROM_BASE*/
-          for (i = 0; i <= 7; i++)
-          {
-            EE_Write(0, (8 + i), appEui[i]);
-          }
-        }
+			if (EE_compareArrays(&appEui[0], &OutappEui[0], 8) == 0) {
+				/* store the appEUI in eeprom - see DATA_EEPROM_BASE*/
+				for (i = 0; i <= 7; i++) {
+					EE_Write(0, (8 + i), appEui[i]);
+				}
+			}
 
 #ifdef USE_LRWAN_NS1
-        Lora_SetDefault();
+			Lora_SetDefault();
 
-        /*Lora_SetWDT(0);*/
-        Lora_SleepMode(AUTOON);
-        Lora_SetDeviceBand((BandPlans_t)LoraDriverParam->BandPlan);
+			/*Lora_SetWDT(0);*/
+			Lora_SleepMode(AUTOON);
+			Lora_SetDeviceBand((BandPlans_t) LoraDriverParam->BandPlan);
 
-        /*set-up the IDs's node -- uncomment this line if you want to set AppEui to other value*/
-        /*LoRa_SetAppID(AppEui);*/
+			/*set-up the IDs's node -- uncomment this line if you want to set AppEui to other value*/
+			/*LoRa_SetAppID(AppEui);*/
 
-        /* Re-reading to be sure that IDs's node have been taken into account*/
-        // uint32_t devAddr[4]; // YB: also hide this field, else warning unused
-        //LoRa_GetDeviceAddress(devAddr); // YB : this function crashes probably because of a bad pointer usage in lrwan_ns1 driver FIXME
-
-        Lora_SetJoinMode(LoraDriverParam->JoinMode);
+			/* Re-reading to be sure that IDs's node have been taken into account*/
+			// uint32_t devAddr[4]; // YB: also hide this field, else warning unused
+			//LoRa_GetDeviceAddress(devAddr); // YB : this function crashes probably because of a bad pointer usage in lrwan_ns1 driver FIXME
+			Lora_SetJoinMode(LoraDriverParam->JoinMode);
 #endif
-        DeviceState = DEVICE_READY;
-        DBG_PRINTF("Lora module ready\n");
+			DeviceState = DEVICE_READY;
+
 
 #if USE_MDM32L07X01
         /*Set the modem Join mode following application set-up*/
@@ -1998,38 +1867,37 @@ void Lora_fsm(void)
         }
 #endif
 
-        /*to adapt the data rate during transmission*/
-        if (0) { // YB:  just an easy switch between ADR ON or OFF
-        	LoraCmdRetCode = Lora_SetAdaptiveDataRate(ADAPT_DATA_RATE_ENABLE);
-        } else {
-        	LoraCmdRetCode = Lora_SetAdaptiveDataRate(ADAPT_DATA_RATE_DISABLE);
-          LoraCmdRetCode = Lora_SetDataRate(DR_3); //YB: the underlying lrwan_ns1 driver crashed on this high level API call
-        }
+			/*to adapt the data rate during transmission*/
+			if (0) { // YB:  just an easy switch between ADR ON or OFF
+				LoraCmdRetCode = Lora_SetAdaptiveDataRate(
+				ADAPT_DATA_RATE_ENABLE);
+			} else {
+				LoraCmdRetCode = Lora_SetAdaptiveDataRate(
+				ADAPT_DATA_RATE_DISABLE);
+				LoraCmdRetCode = Lora_SetDataRate(DR_3); //YB: the underlying lrwan_ns1 driver crashed on this high level API call
+			}
 
 #ifdef USE_LRWAN_NS1
-        /* to be compliante with the new RisingHF module FW V3.5.9*/
-        /* Now the module is reset when the watchdog is turned off*/
-        Lora_SetWDT(0);
-        HAL_Delay(2000);
+			/* to be compliante with the new RisingHF module FW V3.5.9*/
+			/* Now the module is reset when the watchdog is turned off*/
+			Lora_SetWDT(0);
+			HAL_Delay(2000);
 #endif
-        /* Timer for sensor occurrence measure*/
-        UTIL_TIMER_Create(&NextSensorMeasureTimer, 0xFFFFFFFFU, UTIL_TIMER_ONESHOT, Lora_OnNextSensorMeasureTimerEvt, NULL);
+			/* Timer for sensor occurrence measure*/
+			UTIL_TIMER_Create(&NextSensorMeasureTimer, 0xFFFFFFFFU,
+					UTIL_TIMER_ONESHOT, Lora_OnNextSensorMeasureTimerEvt, NULL);
 
-      }
-      else
-      {
-        DBG_PRINTF("Lora module not ready\n");   /*we stay in Init state and redo Lora_Init*/
-      }
-      break;
-    }
-    case DEVICE_READY:
-    {
-      /* Do a join request to the LoRaWAN network - can be ABP or OTAA  Join mode*/
-      /* Nota : Join Mode parameter                                              */
-      /*          - relevant for USI modem                                       */
-      /*          - For Murata version <= 1.3.1 not releavant cf.UM 2073         */
-      /*          - relevant for WL55 modem                                      */
-
+		} else {
+			DBG_PRINTF("Lora module not ready\n"); /*we stay in Init state and redo Lora_Init*/
+		}
+		break;
+	}
+	case DEVICE_READY: {
+		/* Do a join request to the LoRaWAN network - can be ABP or OTAA  Join mode*/
+		/* Nota : Join Mode parameter                                              */
+		/*          - relevant for USI modem                                       */
+		/*          - For Murata version <= 1.3.1 not releavant cf.UM 2073         */
+		/*          - relevant for WL55 modem                                      */
 
 #ifdef USE_I_NUCLEO_LRWAN1             /* Led on Modem slave device to indicate a Join request*/
       Master_LED_Modem_On(LED_GREEN);
@@ -2041,35 +1909,34 @@ void Lora_fsm(void)
       BSP_LED_On(LED2);
 #endif
 
+		UTIL_TIMER_Create(&DemoLedTimer, 0xFFFFFFFFU, UTIL_TIMER_ONESHOT,
+				Lora_OnLedTimerEvent, NULL);
 
-      UTIL_TIMER_Create(&DemoLedTimer, 0xFFFFFFFFU, UTIL_TIMER_ONESHOT, Lora_OnLedTimerEvent, NULL);
+		UTIL_TIMER_SetPeriod(&DemoLedTimer, 200);
 
-      UTIL_TIMER_SetPeriod(&DemoLedTimer, 200);
+		UTIL_TIMER_Start(&DemoLedTimer);
 
-      UTIL_TIMER_Start(&DemoLedTimer);
-
-      LoraCmdRetCode = Lora_Join(LoraDriverParam->JoinMode);
-      switch (LoraCmdRetCode)
-      {
+		LoraCmdRetCode = Lora_Join(LoraDriverParam->JoinMode);
+		switch (LoraCmdRetCode) {
 #ifdef USE_LRWAN_NS1
-        case ATCTL_RET_CMD_JOIN:
+		case ATCTL_RET_CMD_JOIN:
 #else
         case AT_OK:
 #endif
-          {
-            DeviceState = DEVICE_JOINED;
+		{
+			DeviceState = DEVICE_JOINED;
 #ifdef USE_LRWAN_NS1
-            DeviceSubState = DEVICE_INIT;
+			DeviceSubState = DEVICE_INIT;
 #endif
-            DBG_PRINTF("Nwk Joined\n");
-            break;
-          }
+			DBG_PRINTF("Nwk Joined\n");
+			break;
+		}
 #ifdef USE_LRWAN_NS1
-        case ATCTL_RET_IDLE:
+		case ATCTL_RET_IDLE:
 #else
         case AT_JOIN_SLEEP_TRANSITION:    /*waiting asynchronous event from modem*/
 #endif
-          {
+		{
 #ifdef USE_I_NUCLEO_LRWAN1
             /*Protect Timer to overcome the USI Problem -- USI modem doesn't return value when the netork is not joined*/
             /*on timer out we will go out of the sleep mode*/
@@ -2077,24 +1944,23 @@ void Lora_fsm(void)
             UTIL_TIMER_SetPeriod(&JoinProtectTimer, 20000);
             UTIL_TIMER_Start(&JoinProtectTimer);
 #endif
-            DeviceState = DEVICE_SLEEP;
-            DeviceSubState = DEVICE_JOIN_ON_GOING;
-            break;
-          }
-        default:
-          DBG_PRINTF("Nwk Not Joined\n");   /* we stay in ready state and redo LoRa_Join*/
-          break;
-      }
-      break;
-    }
-    case DEVICE_JOINED:
-    {
-      DBG_PRINTF("Nwk Joined - waiting\n");
-      /*Schedule the first mesaure */
+			DeviceState = DEVICE_SLEEP;
+			DeviceSubState = DEVICE_JOIN_ON_GOING;
+			break;
+		}
+		default:
+			DBG_PRINTF("Nwk Not Joined\n"); /* we stay in ready state and redo LoRa_Join*/
+			break;
+		}
+		break;
+	}
+	case DEVICE_JOINED: {
+		DBG_PRINTF("Nwk Joined - waiting\n");
+		/*Schedule the first mesaure */
 
-      UTIL_TIMER_SetPeriod(&NextSensorMeasureTimer,
-                           LoraDriverParam->SensorCycleMeasure /*SENSORS_MEASURE_CYCLE*/);  /* every #n ms*/
-      UTIL_TIMER_Start(&NextSensorMeasureTimer);
+		UTIL_TIMER_SetPeriod(&NextSensorMeasureTimer,
+				LoraDriverParam->SensorCycleMeasure /*SENSORS_MEASURE_CYCLE*/); /* every #n ms*/
+		UTIL_TIMER_Start(&NextSensorMeasureTimer);
 
 #if defined (USE_I_NUCLEO_LRWAN1) && defined (MODEM_IN_SLEEP_MODE)
       /*put the modem MCU in stop mode*/
@@ -2103,16 +1969,14 @@ void Lora_fsm(void)
         LoraCmdRetCode = Lora_SleepMode();
       }
 #endif
-      DeviceState = DEVICE_SLEEP;
-      break;
-    }
-    case DEVICE_SLEEP:
-    {
-      /* Wake up through RTC events or asynchronous event coming from modem*/
-      if (DeviceSubState == DEVICE_JOIN_ON_GOING)
-      {
+		DeviceState = DEVICE_SLEEP;
+		break;
+	}
+	case DEVICE_SLEEP: {
+		/* Wake up through RTC events or asynchronous event coming from modem*/
+		if (DeviceSubState == DEVICE_JOIN_ON_GOING) {
 #ifdef USE_LRWAN_NS1
-        DeviceState = DEVICE_READY;
+			DeviceState = DEVICE_READY;
 #else
         LoraCmdRetCode = Lora_JoinAccept();
 
@@ -2131,11 +1995,10 @@ void Lora_fsm(void)
           DBG_PRINTF("Nwk Not Joined\n");   /* we stay in ready state and redo LoRa_Join*/
         }
 #endif
-      }
-      break;
-    }
-    case DEVICE_SEND:
-    {
+		}
+		break;
+	}
+	case DEVICE_SEND: {
 
 #if defined (USE_I_NUCLEO_LRWAN1)     /*only applicable for USI LoRA modem*/
       if (SensorTimerWakeup) /*the wakeup comes from Timer*/
@@ -2151,8 +2014,8 @@ void Lora_fsm(void)
         }
 #endif
 
-        /*Sensor reading on slave device*/
-        LoraDriverCallbacks->SensorMeasureData(&SendDataBinary);
+		/*Sensor reading on slave device*/
+		LoraDriverCallbacks->SensorMeasureData(&SendDataBinary);
 
 #ifdef USE_I_NUCLEO_LRWAN1              /* Led on Modem slave device to indicate a send request*/
         Master_LED_Modem_On(LED_GREEN);
@@ -2162,16 +2025,35 @@ void Lora_fsm(void)
         BSP_LED_On(LED2);
 #endif
 
-        /* turn off led in 200ms via Lora_OnLedTimerEvent*/
-        UTIL_TIMER_Create(&DemoLedTimer, 0xFFFFFFFFU, UTIL_TIMER_ONESHOT, Lora_OnLedTimerEvent, NULL);
-        UTIL_TIMER_SetPeriod(&DemoLedTimer, 200);
-        UTIL_TIMER_Start(&DemoLedTimer);
+		/* turn off led in 200ms via Lora_OnLedTimerEvent*/
+		UTIL_TIMER_Create(&DemoLedTimer, 0xFFFFFFFFU, UTIL_TIMER_ONESHOT,
+				Lora_OnLedTimerEvent, NULL);
+		UTIL_TIMER_SetPeriod(&DemoLedTimer, 200);
+		UTIL_TIMER_Start(&DemoLedTimer);
 
-        // 9. TODO LORA
-        // call the appropriate Lora driver function to send the binary data we formatted earlier.
-        // also: check and print the return code, verbose it and compare against status AT_OK 
+		// 9. TODO LORA
+		// call the appropriate Lora driver function to send the binary data we formatted earlier.
+		// also: check and print the return code, verbose it and compare against status AT_OK
 
-    
+		// 9. TODO LORA
+
+		ATEerror_t LoraCmdRetCode;
+
+		LoraCmdRetCode = Lora_SendDataBin(&SendDataBinary);
+
+		dbg_printf_send("Send return code: %d\n", LoraCmdRetCode);
+
+		if (LoraCmdRetCode == ATCTL_RET_CMD_OK)
+		{
+		    dbg_printf_send("LoRa Send SUCCESS\n");
+		}
+		else
+		{
+		    dbg_printf_send("LoRa Send FAILED\n");
+		}
+
+
+
 #ifndef USE_LRWAN_NS1
         if (LoraCmdRetCode == AT_OK)
         {
@@ -2183,10 +2065,10 @@ void Lora_fsm(void)
         }
 #endif
 
-        /*Schedule the next measure */
-        UTIL_TIMER_SetPeriod(&NextSensorMeasureTimer,
-                             LoraDriverParam->SensorCycleMeasure /*SENSORS_MEASURE_CYCLE*/);  /* every #n ms*/
-        UTIL_TIMER_Start(&NextSensorMeasureTimer);
+		/*Schedule the next measure */
+		UTIL_TIMER_SetPeriod(&NextSensorMeasureTimer,
+				LoraDriverParam->SensorCycleMeasure /*SENSORS_MEASURE_CYCLE*/); /* every #n ms*/
+		UTIL_TIMER_Start(&NextSensorMeasureTimer);
 
 #if defined (USE_I_NUCLEO_LRWAN1) && defined (MODEM_IN_SLEEP_MODE)
         /*put the modem MCU in stop mode*/
@@ -2218,31 +2100,27 @@ void Lora_fsm(void)
       }
 #endif
 
-      DeviceState = DEVICE_SLEEP;
-      break;
-    }
-    default:
-    {
-      DeviceState = DEVICE_INIT;
-      break;
-    }
-  }
+		DeviceState = DEVICE_SLEEP;
+		break;
+	}
+	default: {
+		DeviceState = DEVICE_INIT;
+		break;
+	}
+	}
 }
 
-
-
 /******************************************************************************
-  * @Brief Context InitialModem following the lora device modem used
-  * @param Period to do sensors measurement
-  * @retval None
-  ******************************************************************************/
-void Lora_Ctx_Init(LoRaDriverCallback_t  *PtrLoRaDriverCallbacks,
-                   LoRaDriverParam_t *PtrLoRaDriverParam)
-{
+ * @Brief Context InitialModem following the lora device modem used
+ * @param Period to do sensors measurement
+ * @retval None
+ ******************************************************************************/
+void Lora_Ctx_Init(LoRaDriverCallback_t *PtrLoRaDriverCallbacks,
+		LoRaDriverParam_t *PtrLoRaDriverParam) {
 
-  /* init the main call backs*/
-  LoraDriverCallbacks = PtrLoRaDriverCallbacks;
-  LoraDriverParam = PtrLoRaDriverParam;
+	/* init the main call backs*/
+	LoraDriverCallbacks = PtrLoRaDriverCallbacks;
+	LoraDriverParam = PtrLoRaDriverParam;
 
 #ifdef USE_I_NUCLEO_LRWAN1
   Master_LED_Modem_Init(LED_GREEN);   /*Led indicator on Modem slave device*/
@@ -2252,25 +2130,23 @@ void Lora_Ctx_Init(LoRaDriverCallback_t  *PtrLoRaDriverCallbacks,
   BSP_LED_Init(LED2);              /*Led indicator on Nucleo masterw board*/
 #endif
 
+	/*Do a Modem reset in a hidden way in order to synchronize Host and Modem*/
+	/*Lora_Reset();*/
 
-  /*Do a Modem reset in a hidden way in order to synchronize Host and Modem*/
-  /*Lora_Reset();*/
-
-  /***************************************************************************/
-  /*          disabling the echo mode which is by default active             */
-  /*        from USI FW V2.6, echo mode will be disable by default.          */
-  /*        Then this line could be removed                                  */
-  /***************************************************************************/
+	/***************************************************************************/
+	/*          disabling the echo mode which is by default active             */
+	/*        from USI FW V2.6, echo mode will be disable by default.          */
+	/*        Then this line could be removed                                  */
+	/***************************************************************************/
 
 #ifdef USE_I_NUCLEO_LRWAN1
   uint8_t   Mode = 0;
   Modem_AT_Cmd(AT_EXCEPT, AT_ATE, &Mode);
 #endif
 
-
-  /***************************************************************************/
-  /*    To discriminate the FW version where Sleep mode works correctly      */
-  /***************************************************************************/
+	/***************************************************************************/
+	/*    To discriminate the FW version where Sleep mode works correctly      */
+	/***************************************************************************/
 #if 0
   /* since we fix the FWversion to USI_FW_V30 this statement is not necessary*/
   /* could be enabled for user who wants to discriminate the FW version*/
@@ -2295,37 +2171,33 @@ void Lora_Ctx_Init(LoRaDriverCallback_t  *PtrLoRaDriverCallbacks,
 }
 
 /******************************************************************************
-  * @Brief get the current device finate state
-  * @param void
-  * @retval deviceState
-  ******************************************************************************/
-DeviceState_t lora_getDeviceState(void)
-{
-  return DeviceState;
+ * @Brief get the current device finate state
+ * @param void
+ * @retval deviceState
+ ******************************************************************************/
+DeviceState_t lora_getDeviceState(void) {
+	return DeviceState;
 }
-
 
 /*********** private (static) Lora functions *************/
 
-
 /******************************************************************************
-  * @brief Function executed on NextSensorMeeasure Timeout event
-  * @param void* context
-  * @return none
-  ******************************************************************************/
-static void Lora_OnNextSensorMeasureTimerEvt(void *context)
-{
+ * @brief Function executed on NextSensorMeeasure Timeout event
+ * @param void* context
+ * @return none
+ ******************************************************************************/
+static void Lora_OnNextSensorMeasureTimerEvt(void *context) {
 
-  UTIL_TIMER_Stop(&NextSensorMeasureTimer);
-  SensorTimerWakeup = 1;
-  DeviceState = DEVICE_SEND;
+	UTIL_TIMER_Stop(&NextSensorMeasureTimer);
+	SensorTimerWakeup = 1;
+	DeviceState = DEVICE_SEND;
 }
 
 /******************************************************************************
-  * @brief Function executed on NextSensorMeeasure Timeout event
-  * @param void* context
-  * @return none
-  ******************************************************************************/
+ * @brief Function executed on NextSensorMeeasure Timeout event
+ * @param void* context
+ * @return none
+ ******************************************************************************/
 #if USE_I_NUCLEO_LRWAN1
 static void Lora_OnJoinProtectTimerEvt(void *context)
 {
@@ -2336,10 +2208,10 @@ static void Lora_OnJoinProtectTimerEvt(void *context)
 #endif
 
 /******************************************************************************
-  * @brief Function executed on JoinStatusDelayTimerEvt Timeout event
-  * @param void* context
-  * @return none
-  ******************************************************************************/
+ * @brief Function executed on JoinStatusDelayTimerEvt Timeout event
+ * @param void* context
+ * @return none
+ ******************************************************************************/
 #if USE_MDM32L07X01 | USE_LRWAN_NS1
 static void Lora_OnJoinStatusDelayTimerEvt(void *context)
 {
@@ -2349,14 +2221,12 @@ static void Lora_OnJoinStatusDelayTimerEvt(void *context)
 }
 #endif
 
-
 /******************************************************************************
-  * @brief Function executed on LedTimer Timeout event
-  * @param void* context
-  * @return none
-  ******************************************************************************/
-static void Lora_OnLedTimerEvent(void *context)
-{
+ * @brief Function executed on LedTimer Timeout event
+ * @param void* context
+ * @return none
+ ******************************************************************************/
+static void Lora_OnLedTimerEvent(void *context) {
 #ifdef USE_I_NUCLEO_LRWAN1
   Master_LED_Modem_Off(LED_GREEN);
 #elif  USE_MDM32L07X01
@@ -2367,7 +2237,5 @@ static void Lora_OnLedTimerEvent(void *context)
   BSP_LED_Off(LED2);
 #endif
 }
-
-
 
 /************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/
