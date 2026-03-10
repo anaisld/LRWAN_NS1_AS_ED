@@ -169,8 +169,9 @@ static void SensorMeasureData(sSendDataBinary_t *SendDataBinary)
   uint16_t pressure = 0;
   int16_t temperature = 0;
   uint8_t humidity = 0;
-  //uint32_t BatLevel = 0;               // end device connected to external power source
-  //ATEerror_t LoraCmdRetCode;
+  uint32_t BatLevel = 0;               // end device connected to external power source
+  ATEerror_t LoraCmdRetCode;
+  uint8_t battery_percent = 0;
 
   uint8_t index = 0;
   /*read pressure, Humidity and Temperature in order to be send on LoRaWAN*/
@@ -185,9 +186,9 @@ static void SensorMeasureData(sSendDataBinary_t *SendDataBinary)
   // 1. TODO LORA USE_LRWAN_NS1: #if defined()/#endif style 
   // 1. TODO LORA USE_LRWAN_NS1: hint: use dbg_printf_send() (where is it? how does it work?)
 #if defined(CAYENNE_LPP)
-	dbg_printf_send("Temperature: %.2f C\r\n", temperature);
-	dbg_printf_send("Humidity: %.2f \%\r\n", humidity);
-	dbg_printf_send("Pressure: %.2f hPa\r\n", pressure);
+	dbg_printf_send("Temperature: %.2f C\r\n", Sensor.temperature);
+	dbg_printf_send("Humidity: %.2f %%\r\n", Sensor.humidity);
+	dbg_printf_send("Pressure: %.2f hPa\r\n", Sensor.pressure);
 #endif
 
 
@@ -197,22 +198,23 @@ static void SensorMeasureData(sSendDataBinary_t *SendDataBinary)
 	/* Convert float sensor values to fixed precision integers */
 
 	temperature = (int16_t)(Sensor.temperature * 10);
-	pressure    = (uint16_t)(Sensor.pressure / 10);
+	pressure    = (uint16_t)(Sensor.pressure * 10);
 	humidity    = (uint8_t)(Sensor.humidity * 2);
 
 	dbg_printf_send("Temp int: %d\r\n", temperature);
 	dbg_printf_send("Pressure int: %u\r\n", pressure);
-	dbg_printf_send("Humidity int: %u\n", humidity);
+	dbg_printf_send("Humidity int: %u\r\n", humidity);
 
 
 
   // 7. TODO LORA: create your data payload as per defined in the practical work
   // 7. TODO LORA: you will write into the SendDataBinary->Buffer
+
 	/* ---------- BLOCK 1 : GROUP IDENTIFIER ---------- */
 
 	char group_id[] = "AS_ED";
 
-	SendDataBinary->Buffer[index++] = 1;
+	SendDataBinary->Buffer[index++] = 1; // Block Number
 	SendDataBinary->Buffer[index++] = LPP_DATATYPE_FRAME_IDENTIFIER;
 	SendDataBinary->Buffer[index++] = sizeof(group_id) - 1;
 
@@ -248,7 +250,15 @@ static void SensorMeasureData(sSendDataBinary_t *SendDataBinary)
 
 	SendDataBinary->Buffer[index++] = humidity;
 
+
 	/* ---------- BLOCK 5 : BATTERY ---------- */
+
+	LoraCmdRetCode = Lora_GetBatLevel(&BatLevel);
+
+	if (LoraCmdRetCode == ATCTL_RET_CMD_VDD)
+	{
+	    battery_percent = (uint8_t)((BatLevel * 100) / 254);
+	}
 
 	SendDataBinary->Buffer[index++] = 5;
 	SendDataBinary->Buffer[index++] = LPP_DATATYPE_DIGITAL_INPUT;
@@ -268,7 +278,9 @@ static void SensorMeasureData(sSendDataBinary_t *SendDataBinary)
 	    dbg_printf_send("%02X ", SendDataBinary->Buffer[i]);
 	}
 
-	dbg_printf_send("\n");
+	dbg_printf_send("\r\n");
+
+
 
  
 
